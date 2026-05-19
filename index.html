@@ -334,6 +334,12 @@
         .reduce((sum, d) => sum + d.deposit, 0);
     }
 
+    function getCumulativeDeposit(platform, year, data) {
+      return data
+        .filter(d => d.platform === platform && d.year <= year && d.deposit)
+        .reduce((sum, d) => sum + d.deposit, 0);
+    }
+
     function renderTable(data) {
       const tbody = document.querySelector('#table tbody');
       const enriched = getGrowth(data);
@@ -356,8 +362,9 @@
 
         platformRows.forEach(item => {
           const depositDisplay = item.deposit ? `$${item.deposit.toLocaleString()}` : '—';
-          const roiDisplay = item.growth !== null
-            ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`
+          const cumDeposit = getCumulativeDeposit(platform, item.year, data);
+          const roiDisplay = cumDeposit > 0
+            ? `<span class="growth ${item.value >= cumDeposit ? 'positive' : 'negative'}">${((item.value - cumDeposit) / cumDeposit * 100) >= 0 ? '+' : ''}${((item.value - cumDeposit) / cumDeposit * 100).toFixed(1)}%</span>`
             : '—';
           html += `<tr>
             <td style="padding-left: 32px;">${item.year}</td>
