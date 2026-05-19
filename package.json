@@ -1,0 +1,7 @@
+{
+  "name": "investment-tracker",
+  "private": true,
+  "dependencies": {
+    "@upstash/redis": "^1.34.3"
+  }
+}
