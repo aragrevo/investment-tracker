@@ -118,6 +118,12 @@
     .growth.positive { color: #22c55e; }
     .growth.negative { color: #ef4444; }
     .actions { display: flex; gap: 8px; }
+    .platform-header td {
+      background: var(--bg);
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
     .chart-container {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -192,20 +198,6 @@
     <div class="summary" id="summary"></div>
 
     <div class="section">
-      <div class="section-title">Registros</div>
-      <table id="table">
-        <thead><tr>
-          <th>Plataforma</th>
-          <th>Año</th>
-          <th>Valor (USD)</th>
-          <th>Crecimiento</th>
-          <th></th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="section">
       <div class="section-title">Quanfury, Hapi, Binance y Tyba</div>
       <div class="chart-container">
         <canvas id="chart"></canvas>
@@ -216,6 +208,19 @@
           <div class="legend-item"><div class="legend-color" style="background:#22c55e"></div>Tyba</div>
         </div>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Registros</div>
+      <table id="table">
+        <thead><tr>
+          <th>Año</th>
+          <th>Valor (USD)</th>
+          <th>Crecimiento</th>
+          <th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 
@@ -321,22 +326,33 @@
     function renderTable(data) {
       const tbody = document.querySelector('#table tbody');
       const enriched = getGrowth(data);
-      tbody.innerHTML = enriched.map(item => {
-        const dotClass = item.platform.toLowerCase();
-        const growthDisplay = item.growth !== null
-          ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`
-          : '—';
-        return `<tr>
-          <td><span class="platform-dot ${dotClass}"></span>${item.platform}</td>
-          <td>${item.year}</td>
-          <td>$${item.value.toLocaleString()}</td>
-          <td>${growthDisplay}</td>
-          <td class="actions">
-            <button class="btn btn-small" onclick="editInvestment(${item.id})">Editar</button>
-            <button class="btn btn-small btn-danger" onclick="deleteInvestment(${item.id})">Eliminar</button>
-          </td>
+      let html = '';
+
+      PLATFORMS.forEach(platform => {
+        const platformRows = enriched.filter(item => item.platform === platform);
+        if (platformRows.length === 0) return;
+
+        html += `<tr class="platform-header">
+          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform}</td>
         </tr>`;
-      }).join('');
+
+        platformRows.forEach(item => {
+          const growthDisplay = item.growth !== null
+            ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`
+            : '—';
+          html += `<tr>
+            <td style="padding-left: 32px;">${item.year}</td>
+            <td>$${item.value.toLocaleString()}</td>
+            <td>${growthDisplay}</td>
+            <td class="actions">
+              <button class="btn btn-small" onclick="editInvestment(${item.id})">Editar</button>
+              <button class="btn btn-small btn-danger" onclick="deleteInvestment(${item.id})">Eliminar</button>
+            </td>
+          </tr>`;
+        });
+      });
+
+      tbody.innerHTML = html;
     }
 
     function renderChart(data) {
