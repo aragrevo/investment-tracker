@@ -344,8 +344,8 @@
         if (platformRows.length === 0) return;
 
         const totalDeposit = getTotalDeposit(platform, data);
-        const latestValue = platformRows[platformRows.length - 1].value;
-        const firstValue = platformRows[0].value;
+        const latestValue = platformRows[0].value;
+        const firstValue = platformRows[platformRows.length - 1].value;
         const totalInvested = firstValue + totalDeposit;
         let platformRoi;
         if (totalInvested > 0) {
