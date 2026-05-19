@@ -345,7 +345,15 @@
 
         const totalDeposit = getTotalDeposit(platform, data);
         const latestValue = platformRows[platformRows.length - 1].value;
-        const platformRoi = totalDeposit > 0 ? ((latestValue - totalDeposit) / totalDeposit * 100) : null;
+        const firstValue = platformRows[0].value;
+        let platformRoi;
+        if (totalDeposit > 0) {
+          platformRoi = ((latestValue - totalDeposit) / totalDeposit * 100);
+        } else if (firstValue > 0) {
+          platformRoi = ((latestValue - firstValue) / firstValue * 100);
+        } else {
+          platformRoi = null;
+        }
         const roiDisplay = platformRoi !== null
           ? `<span class="growth ${platformRoi >= 0 ? 'positive' : 'negative'}">${platformRoi >= 0 ? '+' : ''}${platformRoi.toFixed(1)}%</span>`
           : '—';
