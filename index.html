@@ -311,7 +311,7 @@
         const prev = getPreviousValue(item.platform, item.year, data);
         const growth = prev ? ((item.value - prev) / prev * 100) : null;
         return { ...item, growth };
-      }).sort((a, b) => PLATFORMS.indexOf(a.platform) - PLATFORMS.indexOf(b.platform) || a.year - b.year);
+      }).sort((a, b) => PLATFORMS.indexOf(a.platform) - PLATFORMS.indexOf(b.platform) || b.year - a.year);
     }
 
     function renderSummary(data) {
