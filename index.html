@@ -357,14 +357,105 @@
         flex-direction: column;
       }
     }
+
+    .login-screen {
+      display: none;
+      min-height: 100vh;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .login-screen.active {
+      display: flex;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .login-card h1 {
+      font-size: 1.3rem;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .login-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .login-error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    #app {
+      display: none;
+    }
+
+    #app.active {
+      display: block;
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover {
+      border-color: var(--text-muted);
+      color: var(--text);
+    }
   </style>
 </head>
 
 <body>
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <h1>Investment Tracker</h1>
+      <p>Accedé a tu panel de inversiones</p>
+      <div class="login-error" id="loginError"></div>
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" id="loginUser" placeholder="Usuario" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="doLogin()" id="loginBtn">Ingresar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app">
   <div class="container">
     <header>
       <h1>Investment Tracker</h1>
-      <button class="btn" onclick="openModal()">+ Agregar</button>
+      <div style="display:flex;gap:12px">
+        <button class="btn" onclick="openModal()">+ Agregar</button>
+        <button class="btn-logout" onclick="doLogout()">Salir</button>
+      </div>
     </header>
 
     <div class="summary" id="summary"></div>
@@ -407,6 +498,8 @@
     </div>
   </div>
 
+  </div>
+
   <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
     <div class="modal">
       <h2 id="modalTitle">Agregar Inversión</h2>
@@ -446,9 +539,89 @@
 
     let cachedData = null;
 
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth', { credentials: 'include' });
+        const data = await res.json();
+        if (data.authenticated) {
+          document.getElementById('loginScreen').classList.remove('active');
+          document.getElementById('app').classList.add('active');
+          refresh();
+        } else {
+          showLogin();
+        }
+      } catch {
+        showLogin();
+      }
+    }
+
+    function showLogin() {
+      document.getElementById('loginScreen').classList.add('active');
+      document.getElementById('app').classList.remove('active');
+    }
+
+    async function doLogin() {
+      const username = document.getElementById('loginUser').value;
+      const password = document.getElementById('loginPass').value;
+      const errorEl = document.getElementById('loginError');
+      const btn = document.getElementById('loginBtn');
+
+      if (!username || !password) {
+        errorEl.textContent = 'Completá usuario y contraseña';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Ingresando...';
+      errorEl.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+
+        if (res.ok) {
+          document.getElementById('loginScreen').classList.remove('active');
+          document.getElementById('app').classList.add('active');
+          document.getElementById('loginUser').value = '';
+          document.getElementById('loginPass').value = '';
+          cachedData = null;
+          refresh();
+        } else {
+          const err = await res.json();
+          errorEl.textContent = err.error || 'Error al iniciar sesión';
+          errorEl.style.display = 'block';
+        }
+      } catch {
+        errorEl.textContent = 'Error de conexión';
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ingresar';
+      }
+    }
+
+    async function doLogout() {
+      await fetch('/api/auth', { method: 'DELETE', credentials: 'include' });
+      cachedData = null;
+      showLogin();
+    }
+
+    document.getElementById('loginPass').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    document.getElementById('loginUser').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('loginPass').focus();
+    });
+
     async function getData() {
       if (cachedData) return cachedData;
-      const res = await fetch('/api/investments');
+      const res = await fetch('/api/investments', { credentials: 'include' });
       cachedData = await res.json();
       return cachedData;
     }
@@ -458,6 +631,7 @@
       await fetch('/api/investments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ data }),
       });
     }
@@ -696,7 +870,7 @@
       renderChart(await getData());
     });
 
-    refresh();
+    checkAuth();
   </script>
 </body>
 

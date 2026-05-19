@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { verifyAuth } from "./auth.js";
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL,
@@ -27,13 +28,37 @@ const SEED_DATA = [
   { platform: "Tyba", year: 2027, value: 831 },
 ];
 
+function parseBody(req) {
+  return new Promise((resolve) => {
+    if (req.body && typeof req.body === 'object') {
+      resolve(req.body);
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
+  }
+
+  const user = await verifyAuth(req);
+  if (!user) {
+    return res.status(401).json({ error: "No autenticado" });
   }
 
   if (req.method === "GET") {
@@ -49,7 +74,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const { data } = req.body;
+    const { data } = await parseBody(req);
     if (!Array.isArray(data)) {
       return res.status(400).json({ error: "data must be an array" });
     }
