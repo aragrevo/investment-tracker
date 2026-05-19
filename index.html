@@ -344,13 +344,19 @@
         if (platformRows.length === 0) return;
 
         const totalDeposit = getTotalDeposit(platform, data);
+        const latestValue = platformRows[platformRows.length - 1].value;
+        const platformRoi = totalDeposit > 0 ? ((latestValue - totalDeposit) / totalDeposit * 100) : null;
+        const roiDisplay = platformRoi !== null
+          ? `<span class="growth ${platformRoi >= 0 ? 'positive' : 'negative'}">${platformRoi >= 0 ? '+' : ''}${platformRoi.toFixed(1)}%</span>`
+          : '—';
+
         html += `<tr class="platform-header">
-          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform} — Total depositado: $${totalDeposit.toLocaleString()}</td>
+          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform} — Total depositado: $${totalDeposit.toLocaleString()} — ROI: ${roiDisplay}</td>
         </tr>`;
 
         platformRows.forEach(item => {
           const depositDisplay = item.deposit ? `$${item.deposit.toLocaleString()}` : '—';
-          const roiDisplay = item.deposit && item.deposit > 0
+          const roiDisplay = item.growth !== null
             ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`
             : '—';
           html += `<tr>
