@@ -124,6 +124,27 @@
       font-size: 0.9rem;
       color: var(--text);
     }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .badge-deposit {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+    }
+    .badge-roi {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+    .badge-roi.negative {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
     .chart-container {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -354,11 +375,11 @@
           platformRoi = null;
         }
         const roiDisplay = platformRoi !== null
-          ? `<span class="growth ${platformRoi >= 0 ? 'positive' : 'negative'}">${platformRoi >= 0 ? '+' : ''}${platformRoi.toFixed(1)}%</span>`
-          : '—';
+          ? `<span class="badge badge-roi ${platformRoi < 0 ? 'negative' : ''}">ROI ${platformRoi >= 0 ? '+' : ''}${platformRoi.toFixed(1)}%</span>`
+          : '';
 
         html += `<tr class="platform-header">
-          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform} — Total depositado: $${totalDeposit.toLocaleString()} — ROI: ${roiDisplay}</td>
+          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform} <span class="badge badge-deposit">Depositado $${totalDeposit.toLocaleString()}</span> ${roiDisplay}</td>
         </tr>`;
 
         platformRows.forEach(item => {
