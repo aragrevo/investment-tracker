@@ -216,7 +216,8 @@
         <thead><tr>
           <th>Año</th>
           <th>Valor (USD)</th>
-          <th>Crecimiento</th>
+          <th>Depósito</th>
+          <th>ROI</th>
           <th></th>
         </tr></thead>
         <tbody></tbody>
@@ -244,6 +245,10 @@
       <div class="form-group">
         <label>Valor (USD)</label>
         <input type="number" id="value" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label>Depósito (USD)</label>
+        <input type="number" id="deposit" min="0" step="0.01" placeholder="0.00">
       </div>
       <div class="modal-actions">
         <button class="btn" onclick="saveInvestment()">Guardar</button>
@@ -323,6 +328,12 @@
       }).join('');
     }
 
+    function getTotalDeposit(platform, data) {
+      return data
+        .filter(d => d.platform === platform && d.deposit)
+        .reduce((sum, d) => sum + d.deposit, 0);
+    }
+
     function renderTable(data) {
       const tbody = document.querySelector('#table tbody');
       const enriched = getGrowth(data);
@@ -332,18 +343,21 @@
         const platformRows = enriched.filter(item => item.platform === platform);
         if (platformRows.length === 0) return;
 
+        const totalDeposit = getTotalDeposit(platform, data);
         html += `<tr class="platform-header">
-          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform}</td>
+          <td colspan="5"><span class="platform-dot ${platform.toLowerCase()}"></span>${platform} — Total depositado: $${totalDeposit.toLocaleString()}</td>
         </tr>`;
 
         platformRows.forEach(item => {
-          const growthDisplay = item.growth !== null
+          const depositDisplay = item.deposit ? `$${item.deposit.toLocaleString()}` : '—';
+          const roiDisplay = item.deposit && item.deposit > 0
             ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`
             : '—';
           html += `<tr>
             <td style="padding-left: 32px;">${item.year}</td>
             <td>$${item.value.toLocaleString()}</td>
-            <td>${growthDisplay}</td>
+            <td>${depositDisplay}</td>
+            <td>${roiDisplay}</td>
             <td class="actions">
               <button class="btn btn-small" onclick="editInvestment(${item.id})">Editar</button>
               <button class="btn btn-small btn-danger" onclick="deleteInvestment(${item.id})">Eliminar</button>
@@ -442,10 +456,12 @@
         document.getElementById('platform').value = item.platform;
         document.getElementById('year').value = item.year;
         document.getElementById('value').value = item.value;
+        document.getElementById('deposit').value = item.deposit || '';
       } else {
         document.getElementById('platform').value = 'Quanfury';
         document.getElementById('year').value = '2024';
         document.getElementById('value').value = '';
+        document.getElementById('deposit').value = '';
       }
     }
 
@@ -457,7 +473,8 @@
       const id = document.getElementById('editId').value;
       const platform = document.getElementById('platform').value;
       const year = parseInt(document.getElementById('year').value);
-      const value = parseFloat(document.getElementById('value').value);
+      const value = parseFloat(document.getElementById('value').value) || 0;
+      const deposit = parseFloat(document.getElementById('deposit').value) || 0;
 
       if (!value || value < 0) {
         alert('ingresá un valor válido');
@@ -466,9 +483,9 @@
 
       let data = getData();
       if (id) {
-        data = data.map(d => d.id == id ? { ...d, platform, year, value } : d);
+        data = data.map(d => d.id == id ? { ...d, platform, year, value, deposit } : d);
       } else {
-        data.push({ id: Date.now(), platform, year, value });
+        data.push({ id: Date.now(), platform, year, value, deposit });
       }
       saveData(data);
       closeModal();
