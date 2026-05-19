@@ -356,9 +356,11 @@
 
         platformRows.forEach(item => {
           const depositDisplay = item.deposit ? `$${item.deposit.toLocaleString()}` : '—';
-          const roiDisplay = item.growth !== null
-            ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`
-            : '—';
+          const prev = item.growth !== null ? enriched.find(r => r.platform === item.platform && r.year === item.year - 1) : null;
+          const prevValue = prev ? prev.value : null;
+          const roiDisplay = prevValue !== null && item.deposit !== undefined
+            ? `<span class="growth ${((item.value - prevValue - item.deposit) / (prevValue + item.deposit) * 100) >= 0 ? 'positive' : 'negative'}">${((item.value - prevValue - item.deposit) / (prevValue + item.deposit) * 100) >= 0 ? '+' : ''}${((item.value - prevValue - item.deposit) / (prevValue + item.deposit) * 100).toFixed(1)}%</span>`
+            : (item.growth !== null ? `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>` : '—');
           html += `<tr>
             <td style="padding-left: 32px;">${item.year}</td>
             <td>$${item.value.toLocaleString()}</td>
