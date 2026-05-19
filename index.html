@@ -346,11 +346,10 @@
         const totalDeposit = getTotalDeposit(platform, data);
         const latestValue = platformRows[platformRows.length - 1].value;
         const firstValue = platformRows[0].value;
+        const totalInvested = firstValue + totalDeposit;
         let platformRoi;
-        if (totalDeposit > 0) {
-          platformRoi = ((latestValue - totalDeposit) / totalDeposit * 100);
-        } else if (firstValue > 0) {
-          platformRoi = ((latestValue - firstValue) / firstValue * 100);
+        if (totalInvested > 0) {
+          platformRoi = ((latestValue - totalInvested) / totalInvested * 100);
         } else {
           platformRoi = null;
         }
