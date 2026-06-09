@@ -1,756 +1,692 @@
 ---
-import { getInvestments, type Investment } from '../lib/db';
-import SummaryCard from '../components/SummaryCard.astro';
-import InvestmentTable from '../components/InvestmentTable.astro';
+import { getInvestments, type Investment } from "../lib/db";
+import SummaryCard from "../components/SummaryCard.astro";
+import InvestmentTable from "../components/InvestmentTable.astro";
+import InvestmentChart from "../components/InvestmentChart.astro";
 
 const investments = await getInvestments();
 
 const YEARS = [2023, 2024, 2025, 2026, 2027];
-const PLATFORMS = ['Quanfury', 'Hapi', 'Binance', 'Tyba'];
+const PLATFORMS = ["Quanfury", "Hapi", "Binance", "Tyba"];
 
 function getPreviousValue(platform: string, year: number, data: Investment[]) {
-  const sortedYears = YEARS.filter(y => y < year);
+  const sortedYears = YEARS.filter((y) => y < year);
   for (let i = sortedYears.length - 1; i >= 0; i--) {
-    const prev = data.find(d => d.platform === platform && d.year === sortedYears[i]);
+    const prev = data.find(
+      (d) => d.platform === platform && d.year === sortedYears[i],
+    );
     if (prev) return prev.value;
   }
   return null;
 }
 
-function getLatestValue(platform: string, data: Investment[]) {
-  const platformData = data.filter(d => d.platform === platform);
-  if (platformData.length === 0) return { value: 0, years: 0 };
-  const latest = platformData.sort((a, b) => b.year - a.year)[0];
-  return { value: latest.value, years: platformData.length };
+function getPlatformSummary(platform: string, data: Investment[]) {
+  const platformData = data.filter((d) => d.platform === platform);
+  if (platformData.length === 0)
+    return { value: 0, years: 0, deposit: 0, roi: null };
+
+  const sorted = platformData.sort((a, b) => b.year - a.year);
+  const latest = sorted[0];
+  const oldest = sorted[sorted.length - 1];
+  const deposit = platformData.reduce((sum, d) => sum + (d.deposit || 0), 0);
+  const totalInvested = oldest.value + deposit;
+  const roi =
+    totalInvested > 0
+      ? ((latest.value - totalInvested) / totalInvested) * 100
+      : null;
+
+  return { value: latest.value, years: platformData.length, deposit, roi };
 }
 
-const summaries = PLATFORMS.map(platform => ({
+const summaries = PLATFORMS.map((platform) => ({
   platform,
-  ...getLatestValue(platform, investments),
+  ...getPlatformSummary(platform, investments),
 }));
 
 const initialData = investments;
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Investment Tracker</title>
-  <style>
-    :root {
-      --bg: #0f0f1a;
-      --bg-card: #1a1a2e;
-      --bg-input: #16162a;
-      --border: #2d2d4a;
-      --text: #e4e4f0;
-      --text-muted: #8888a8;
-      --accent: #3b82f6;
-      --quanfury: #3b82f6;
-      --hapi: #ef4444;
-      --binance: #eab308;
-      --tyba: #22c55e;
-      --danger: #ef4444;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 24px;
-    }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 32px;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-
-    .btn {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 500;
-      transition: opacity 0.2s;
-    }
-
-    .btn:hover {
-      opacity: 0.85;
-    }
-
-    .btn-danger {
-      border: 1px solid var(--danger);
-      color: var(--danger);
-      background: transparent;
-    }
-
-    .btn-small {
-      padding: 6px 12px;
-      font-size: 0.8rem;
-    }
-
-    .summary {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
-    }
-
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-    }
-
-    .card-label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
-    }
-
-    .card-value {
-      font-size: 1.4rem;
-      font-weight: 600;
-    }
-
-    .card-value.quanfury { color: var(--quanfury); }
-    .card-value.hapi { color: var(--hapi); }
-    .card-value.binance { color: var(--binance); }
-    .card-value.tyba { color: var(--tyba); }
-
-    .section {
-      margin-bottom: 32px;
-    }
-
-    .section-title {
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--bg-card);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    th, td {
-      padding: 12px 16px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-
-    th {
-      background: var(--bg);
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    tr:hover td {
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .platform-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 8px;
-    }
-
-    .platform-dot.quanfury { background: var(--quanfury); }
-    .platform-dot.hapi { background: var(--hapi); }
-    .platform-dot.binance { background: var(--binance); }
-    .platform-dot.tyba { background: var(--tyba); }
-
-    .growth {
-      font-size: 0.85rem;
-    }
-
-    .growth.positive { color: #22c55e; }
-    .growth.negative { color: #ef4444; }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      max-width: 120px;
-    }
-
-    .platform-header td {
-      background: var(--bg);
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: var(--text);
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .platform-header td:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .collapse-icon {
-      display: inline-block;
-      margin-right: 8px;
-      transition: transform 0.3s ease;
-      font-size: 0.7rem;
-    }
-
-    .platform-header.collapsed .collapse-icon {
-      transform: rotate(-90deg);
-    }
-
-    tr.platform-row {
-      transition: opacity 0.25s ease;
-      opacity: 1;
-    }
-
-    tr.platform-row.collapsing {
-      opacity: 0;
-    }
-
-    tr.platform-row.hidden {
-      display: none;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-
-    .badge-deposit {
-      background: rgba(59, 130, 246, 0.15);
-      color: #3b82f6;
-    }
-
-    .badge-roi {
-      background: rgba(34, 197, 94, 0.15);
-      color: #22c55e;
-    }
-
-    .badge-roi.negative {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-    }
-
-    .chart-container {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      position: relative;
-    }
-
-    canvas {
-      width: 100%;
-      height: 300px;
-      display: block;
-    }
-
-    .chart-tooltip {
-      position: absolute;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 0.8rem;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
-      z-index: 10;
-      white-space: nowrap;
-    }
-
-    .chart-tooltip.visible {
-      opacity: 1;
-    }
-
-    .chart-tooltip .tooltip-platform {
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-
-    .chart-tooltip .tooltip-value {
-      color: var(--text-muted);
-    }
-
-    .legend {
-      display: flex;
-      gap: 24px;
-      margin-top: 16px;
-      flex-wrap: wrap;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.85rem;
-    }
-
-    .legend-color {
-      width: 12px;
-      height: 3px;
-      border-radius: 2px;
-    }
-
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.7);
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-      padding: 16px;
-    }
-
-    .modal-overlay.active {
-      display: flex;
-    }
-
-    .modal {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      width: 100%;
-      max-width: 400px;
-    }
-
-    .modal h2 {
-      font-size: 1.1rem;
-      margin-bottom: 20px;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    .form-group input,
-    .form-group select {
-      width: 100%;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      color: var(--text);
-      font-size: 0.9rem;
-    }
-
-    .form-group input:focus,
-    .form-group select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 24px;
-    }
-
-    .modal-actions .btn {
-      flex: 1;
-    }
-
-    @media (max-width: 640px) {
-      body { padding: 16px; }
-      th, td { padding: 10px 12px; font-size: 0.85rem; }
-      .actions { flex-direction: column; }
-    }
-
-    .btn-logout {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .btn-logout:hover {
-      border-color: var(--text-muted);
-      color: var(--text);
-    }
-  </style>
-</head>
-
-<body>
-  <div class="container">
-    <header>
-      <h1>Investment Tracker</h1>
-      <div style="display:flex;gap:12px">
-        <button class="btn" id="addBtn">+ Agregar</button>
-        <button class="btn-logout" id="logoutBtn">Salir</button>
-      </div>
-    </header>
-
-    <div class="summary">
-      {summaries.map(s => (
-        <SummaryCard platform={s.platform} value={s.value} years={s.years} />
-      ))}
-    </div>
-
-    <div class="section">
-      <div class="section-title">Quanfury, Hapi, Binance y Tyba</div>
-      <div class="chart-container">
-        <canvas id="chart"></canvas>
-        <div class="chart-tooltip" id="chartTooltip">
-          <div class="tooltip-platform"></div>
-          <div class="tooltip-value"></div>
-        </div>
-        <div class="legend">
-          <div class="legend-item">
-            <div class="legend-color" style="background:#3b82f6"></div>Quanfury
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background:#ef4444"></div>Hapi
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background:#eab308"></div>Binance
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background:#22c55e"></div>Tyba
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">Registros</div>
-      <InvestmentTable data={investments} />
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal">
-      <h2 id="modalTitle">Agregar Inversión</h2>
-      <input type="hidden" id="editId">
-      <div class="form-group">
-        <label>Plataforma</label>
-        <select id="platform">
-          <option value="Quanfury">Quanfury</option>
-          <option value="Hapi">Hapi</option>
-          <option value="Binance">Binance</option>
-          <option value="Tyba">Tyba</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Año</label>
-        <input type="number" id="year" min="2020" max="2030" value="2024">
-      </div>
-      <div class="form-group">
-        <label>Valor (USD)</label>
-        <input type="number" id="value" min="0" step="0.01" placeholder="0.00">
-      </div>
-      <div class="form-group">
-        <label>Depósito (USD)</label>
-        <input type="number" id="deposit" min="0" step="0.01" placeholder="0.00">
-      </div>
-      <div class="modal-actions">
-        <button class="btn" id="saveBtn">Guardar</button>
-        <button class="btn" style="background:#333" id="cancelBtn">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const YEARS = [2023, 2024, 2025, 2026, 2027];
-    const PLATFORMS = ['Quanfury', 'Hapi', 'Binance', 'Tyba'];
-    const COLORS: Record<string, string> = { Quanfury: '#3b82f6', Hapi: '#ef4444', Binance: '#eab308', Tyba: '#22c55e' };
-
-    const initialData = (window as any).__INITIAL_DATA__ || [];
-    let cachedData = initialData;
-
-    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-      await fetch('/api/auth', { method: 'DELETE', credentials: 'include' });
-      window.location.href = '/login';
-    });
-
-    document.getElementById('addBtn')?.addEventListener('click', () => openModal());
-
-    document.getElementById('cancelBtn')?.addEventListener('click', closeModal);
-
-    document.getElementById('modalOverlay')?.addEventListener('click', (e) => {
-      if (e.target === document.getElementById('modalOverlay')) closeModal();
-    });
-
-    document.querySelector('#table tbody')?.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      const row = target.closest('tr');
-
-      if (row?.classList.contains('platform-header')) {
-        togglePlatform(row.getAttribute('data-platform')!);
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Investment Tracker</title>
+    <style>
+      :root {
+        --bg: #0f0f1a;
+        --bg-card: #1a1a2e;
+        --bg-input: #16162a;
+        --border: #2d2d4a;
+        --text: #e4e4f0;
+        --text-muted: #8888a8;
+        --accent: #3b82f6;
+        --quanfury: #3b82f6;
+        --hapi: #ef4444;
+        --binance: #eab308;
+        --tyba: #22c55e;
+        --danger: #ef4444;
       }
 
-      const action = (target as HTMLElement).dataset.action;
-      const id = (target as HTMLElement).dataset.id;
-
-      if (action === 'edit') {
-        const item = cachedData.find((d: any) => d.id == id);
-        if (item) openModal(id, item);
-      } else if (action === 'delete') {
-        deleteInvestment(id!);
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    });
 
-    function togglePlatform(platform: string) {
-      const header = document.querySelector(`tr.platform-header[data-platform="${platform}"]`);
-      const rows = document.querySelectorAll(`tr.platform-row[data-platform="${platform}"]`);
-      const isCollapsed = header?.classList.contains('collapsed');
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        padding: 24px;
+      }
 
-      header?.classList.toggle('collapsed');
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 0;
+      }
 
-      if (isCollapsed) {
-        rows.forEach(row => {
-          row.classList.remove('hidden');
-          requestAnimationFrame(() => row.classList.remove('collapsing'));
-        });
-      } else {
-        rows.forEach(row => row.classList.add('collapsing'));
-        setTimeout(() => {
-          rows.forEach(row => {
-            row.classList.add('hidden');
-            row.classList.remove('collapsing');
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: opacity 0.2s;
+      }
+
+      .btn:hover {
+        opacity: 0.85;
+      }
+
+      .btn-danger {
+        border: 1px solid var(--danger);
+        color: var(--danger);
+        background: transparent;
+      }
+
+      .btn-small {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+      }
+
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .card-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+      }
+
+      .card-value {
+        font-size: 1.4rem;
+        font-weight: 600;
+      }
+
+      .card-value.quanfury {
+        color: var(--quanfury);
+      }
+      .card-value.hapi {
+        color: var(--hapi);
+      }
+      .card-value.binance {
+        color: var(--binance);
+      }
+      .card-value.tyba {
+        color: var(--tyba);
+      }
+
+      .section {
+        margin-bottom: 32px;
+      }
+
+      .section-title {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--bg-card);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      th,
+      td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+
+      th {
+        background: var(--bg);
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .platform-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      .platform-dot.quanfury {
+        background: var(--quanfury);
+      }
+      .platform-dot.hapi {
+        background: var(--hapi);
+      }
+      .platform-dot.binance {
+        background: var(--binance);
+      }
+      .platform-dot.tyba {
+        background: var(--tyba);
+      }
+
+      .growth {
+        font-size: 0.85rem;
+      }
+
+      .growth.positive {
+        color: #22c55e;
+      }
+      .growth.negative {
+        color: #ef4444;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        max-width: 120px;
+      }
+
+      .platform-header td {
+        background: var(--bg);
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .platform-header td:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .collapse-icon {
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.3s ease;
+        font-size: 0.7rem;
+      }
+
+      .platform-header.collapsed .collapse-icon {
+        transform: rotate(-90deg);
+      }
+
+      tr.platform-row {
+        transition: opacity 0.25s ease;
+        opacity: 1;
+      }
+
+      tr.platform-row.collapsing {
+        opacity: 0;
+      }
+
+      tr.platform-row.hidden {
+        display: none;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+
+      .badge-deposit {
+        background: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+      }
+
+      .badge-roi {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+      }
+
+      .badge-roi.negative {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+      }
+
+      .legend {
+        display: flex;
+        gap: 24px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+      }
+
+      .legend-color {
+        width: 12px;
+        height: 3px;
+        border-radius: 2px;
+      }
+
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        padding: 16px;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      .modal h2 {
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-group label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text);
+        font-size: 0.9rem;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .modal-actions .btn {
+        flex: 1;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 16px;
+        }
+        th,
+        td {
+          padding: 10px 12px;
+          font-size: 0.85rem;
+        }
+        .actions {
+          flex-direction: column;
+        }
+      }
+
+      .btn-logout {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .btn-logout:hover {
+        border-color: var(--text-muted);
+        color: var(--text);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <header>
+        <h1>Investment Tracker</h1>
+        <div style="display:flex;gap:12px">
+          <button class="btn" id="addBtn">+ Agregar</button>
+          <button class="btn-logout" id="logoutBtn">Salir</button>
+        </div>
+      </header>
+
+      <div class="summary">
+        {
+          summaries.map((s) => (
+            <SummaryCard
+              platform={s.platform}
+              value={s.value}
+              years={s.years}
+              deposit={s.deposit}
+              roi={s.roi}
+            />
+          ))
+        }
+      </div>
+
+      <div class="section">
+        <div class="section-title">Quanfury, Hapi, Binance y Tyba</div>
+        <InvestmentChart data={investments} />
+      </div>
+
+      <div class="section">
+        <div class="section-title">Registros</div>
+        <InvestmentTable data={investments} />
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <h2 id="modalTitle">Agregar Inversión</h2>
+        <input type="hidden" id="editId" />
+        <div class="form-group">
+          <label>Plataforma</label>
+          <select id="platform">
+            <option value="Quanfury">Quanfury</option>
+            <option value="Hapi">Hapi</option>
+            <option value="Binance">Binance</option>
+            <option value="Tyba">Tyba</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Año</label>
+          <input type="number" id="year" min="2020" max="2030" value="2024" />
+        </div>
+        <div class="form-group">
+          <label>Valor (USD)</label>
+          <input
+            type="number"
+            id="value"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+          />
+        </div>
+        <div class="form-group">
+          <label>Depósito (USD)</label>
+          <input
+            type="number"
+            id="deposit"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+          />
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="saveBtn">Guardar</button>
+          <button class="btn" style="background:#333" id="cancelBtn"
+            >Cancelar</button
+          >
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const YEARS = [2023, 2024, 2025, 2026, 2027];
+      const PLATFORMS = ["Quanfury", "Hapi", "Binance", "Tyba"];
+      const COLORS: Record<string, string> = {
+        Quanfury: "#3b82f6",
+        Hapi: "#ef4444",
+        Binance: "#eab308",
+        Tyba: "#22c55e",
+      };
+
+      const initialData = (window as any).__INITIAL_DATA__ || [];
+      let cachedData = initialData;
+
+      document
+        .getElementById("logoutBtn")
+        ?.addEventListener("click", async () => {
+          await fetch("/api/auth", {
+            method: "DELETE",
+            credentials: "include",
           });
-        }, 250);
-      }
-    }
-
-    function openModal(id: string | null = null, item: any = null) {
-      document.getElementById('modalOverlay')?.classList.add('active');
-      (document.getElementById('editId') as HTMLInputElement).value = id || '';
-      document.getElementById('modalTitle')!.textContent = id ? 'Editar Inversión' : 'Agregar Inversión';
-
-      if (item) {
-        (document.getElementById('platform') as HTMLSelectElement).value = item.platform;
-        (document.getElementById('year') as HTMLInputElement).value = item.year;
-        (document.getElementById('value') as HTMLInputElement).value = item.value;
-        (document.getElementById('deposit') as HTMLInputElement).value = item.deposit || '';
-      } else {
-        (document.getElementById('platform') as HTMLSelectElement).value = 'Quanfury';
-        (document.getElementById('year') as HTMLInputElement).value = '2024';
-        (document.getElementById('value') as HTMLInputElement).value = '';
-        (document.getElementById('deposit') as HTMLInputElement).value = '';
-      }
-    }
-
-    function closeModal() {
-      document.getElementById('modalOverlay')?.classList.remove('active');
-    }
-
-    async function saveInvestment() {
-      const id = (document.getElementById('editId') as HTMLInputElement).value;
-      const platform = (document.getElementById('platform') as HTMLSelectElement).value;
-      const year = parseInt((document.getElementById('year') as HTMLInputElement).value);
-      const value = parseFloat((document.getElementById('value') as HTMLInputElement).value) || 0;
-      const deposit = parseFloat((document.getElementById('deposit') as HTMLInputElement).value) || 0;
-
-      if (!value || value < 0) {
-        alert('ingresá un valor válido');
-        return;
-      }
-
-      if (id) {
-        cachedData = cachedData.map((d: any) => d.id == id ? { ...d, platform, year, value, deposit } : d);
-      } else {
-        cachedData.push({ id: Date.now(), platform, year, value, deposit });
-      }
-
-      await fetch('/api/investments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ data: cachedData }),
-      });
-
-      window.location.reload();
-    }
-
-    async function deleteInvestment(id: string) {
-      if (!confirm('eliminar esta inversión?')) return;
-      cachedData = cachedData.filter((d: any) => d.id != id);
-      await fetch('/api/investments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ data: cachedData }),
-      });
-      window.location.reload();
-    }
-
-    document.getElementById('saveBtn')?.addEventListener('click', saveInvestment);
-
-    let chartPoints: any[] = [];
-
-    function renderChart() {
-      const canvas = document.getElementById('chart') as HTMLCanvasElement;
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d')!;
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, rect.width, rect.height);
-
-      const padding = { top: 20, right: 30, bottom: 40, left: 60 };
-      const chartW = rect.width - padding.left - padding.right;
-      const chartH = rect.height - padding.top - padding.bottom;
-
-      const allValues = cachedData.map((d: any) => d.value);
-      const maxValue = Math.max(...allValues) * 1.15;
-      const yearCount = YEARS.length;
-
-      ctx.strokeStyle = '#2d2d4a';
-      ctx.lineWidth = 1;
-      const gridLines = 5;
-      for (let i = 0; i <= gridLines; i++) {
-        const y = padding.top + (chartH / gridLines) * i;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(padding.left + chartW, y);
-        ctx.stroke();
-
-        const label = Math.round(maxValue - (maxValue / gridLines) * i);
-        ctx.fillStyle = '#8888a8';
-        ctx.font = '11px -apple-system, sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText('$' + label.toLocaleString(), padding.left - 8, y + 4);
-      }
-
-      ctx.fillStyle = '#8888a8';
-      ctx.font = '11px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      YEARS.forEach((year, i) => {
-        const x = padding.left + (chartW / (yearCount - 1)) * i;
-        ctx.fillText(year.toString(), x, rect.height - 10);
-      });
-
-      chartPoints = [];
-      PLATFORMS.forEach(platform => {
-        const platformData = YEARS.map(year => {
-          const found = cachedData.find((d: any) => d.platform === platform && d.year === year);
-          return found ? found.value : null;
+          window.location.href = "/login";
         });
 
-        ctx.strokeStyle = COLORS[platform];
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        let started = false;
+      document
+        .getElementById("addBtn")
+        ?.addEventListener("click", () => openModal());
 
-        platformData.forEach((val, i) => {
-          if (val === null) return;
-          const x = padding.left + (chartW / (yearCount - 1)) * i;
-          const y = padding.top + chartH - (val / maxValue) * chartH;
-          if (!started) {
-            ctx.moveTo(x, y);
-            started = true;
-          } else {
-            ctx.lineTo(x, y);
-          }
-        });
-        ctx.stroke();
+      document
+        .getElementById("cancelBtn")
+        ?.addEventListener("click", closeModal);
 
-        platformData.forEach((val, i) => {
-          if (val === null) return;
-          const x = padding.left + (chartW / (yearCount - 1)) * i;
-          const y = padding.top + chartH - (val / maxValue) * chartH;
-          ctx.fillStyle = COLORS[platform];
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, Math.PI * 2);
-          ctx.fill();
-          chartPoints.push({ x, y, platform, year: YEARS[i], value: val });
+      document
+        .getElementById("modalOverlay")
+        ?.addEventListener("click", (e) => {
+          if (e.target === document.getElementById("modalOverlay"))
+            closeModal();
         });
+
+      document.querySelector("#table tbody")?.addEventListener("click", (e) => {
+        const target = e.target as HTMLElement;
+        const row = target.closest("tr");
+
+        if (row?.classList.contains("platform-header")) {
+          togglePlatform(row.getAttribute("data-platform")!);
+          return;
+        }
+
+        const action = (target as HTMLElement).dataset.action;
+        const id = (target as HTMLElement).dataset.id;
+
+        if (action === "edit") {
+          const item = cachedData.find((d: any) => d.id == id);
+          if (item) openModal(id, item);
+        } else if (action === "delete") {
+          deleteInvestment(id!);
+        }
       });
-    }
 
-    document.getElementById('chart')?.addEventListener('mousemove', (e) => {
-      const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const tooltip = document.getElementById('chartTooltip')!;
+      function togglePlatform(platform: string) {
+        const header = document.querySelector(
+          `tr.platform-header[data-platform="${platform}"]`,
+        );
+        const rows = document.querySelectorAll(
+          `tr.platform-row[data-platform="${platform}"]`,
+        );
+        const isCollapsed = header?.classList.contains("collapsed");
 
-      const nearPoint = chartPoints.find(p =>
-        Math.abs(p.x - mouseX) < 10 && Math.abs(p.y - mouseY) < 10
-      );
+        header?.classList.toggle("collapsed");
 
-      if (nearPoint) {
-        tooltip.querySelector('.tooltip-platform')!.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[nearPoint.platform]};margin-right:6px"></span>${nearPoint.platform} ${nearPoint.year}`;
-        tooltip.querySelector('.tooltip-value')!.textContent = '$' + nearPoint.value.toLocaleString();
-        tooltip.classList.add('visible');
-        tooltip.style.left = (nearPoint.x + 12) + 'px';
-        tooltip.style.top = (nearPoint.y - 10) + 'px';
-      } else {
-        tooltip.classList.remove('visible');
+        if (isCollapsed) {
+          rows.forEach((row) => {
+            row.classList.remove("hidden");
+            requestAnimationFrame(() => row.classList.remove("collapsing"));
+          });
+        } else {
+          rows.forEach((row) => row.classList.add("collapsing"));
+          setTimeout(() => {
+            rows.forEach((row) => {
+              row.classList.add("hidden");
+              row.classList.remove("collapsing");
+            });
+          }, 250);
+        }
       }
-    });
 
-    document.getElementById('chart')?.addEventListener('mouseleave', () => {
-      document.getElementById('chartTooltip')?.classList.remove('visible');
-    });
+      function openModal(id: string | null = null, item: any = null) {
+        document.getElementById("modalOverlay")?.classList.add("active");
+        (document.getElementById("editId") as HTMLInputElement).value =
+          id || "";
+        document.getElementById("modalTitle")!.textContent = id
+          ? "Editar Inversión"
+          : "Agregar Inversión";
 
-    window.addEventListener('resize', renderChart);
+        if (item) {
+          (document.getElementById("platform") as HTMLSelectElement).value =
+            item.platform;
+          (document.getElementById("year") as HTMLInputElement).value =
+            item.year;
+          (document.getElementById("value") as HTMLInputElement).value =
+            item.value;
+          (document.getElementById("deposit") as HTMLInputElement).value =
+            item.deposit || "";
+        } else {
+          (document.getElementById("platform") as HTMLSelectElement).value =
+            "Quanfury";
+          (document.getElementById("year") as HTMLInputElement).value = "2024";
+          (document.getElementById("value") as HTMLInputElement).value = "";
+          (document.getElementById("deposit") as HTMLInputElement).value = "";
+        }
+      }
 
-    renderChart();
-  </script>
-</body>
+      function closeModal() {
+        document.getElementById("modalOverlay")?.classList.remove("active");
+      }
+
+      async function saveInvestment() {
+        const id = (document.getElementById("editId") as HTMLInputElement)
+          .value;
+        const platform = (
+          document.getElementById("platform") as HTMLSelectElement
+        ).value;
+        const year = parseInt(
+          (document.getElementById("year") as HTMLInputElement).value,
+        );
+        const value =
+          parseFloat(
+            (document.getElementById("value") as HTMLInputElement).value,
+          ) || 0;
+        const deposit =
+          parseFloat(
+            (document.getElementById("deposit") as HTMLInputElement).value,
+          ) || 0;
+
+        if (!value || value < 0) {
+          alert("ingresá un valor válido");
+          return;
+        }
+
+        if (id) {
+          cachedData = cachedData.map((d: any) =>
+            d.id == id ? { ...d, platform, year, value, deposit } : d,
+          );
+        } else {
+          cachedData.push({ id: Date.now(), platform, year, value, deposit });
+        }
+
+        await fetch("/api/investments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ data: cachedData }),
+        });
+
+        window.location.reload();
+      }
+
+      async function deleteInvestment(id: string) {
+        if (!confirm("eliminar esta inversión?")) return;
+        cachedData = cachedData.filter((d: any) => d.id != id);
+        await fetch("/api/investments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ data: cachedData }),
+        });
+        window.location.reload();
+      }
+
+      document
+        .getElementById("saveBtn")
+        ?.addEventListener("click", saveInvestment);
+    </script>
+  </body>
 </html>
 
 <script is:inline define:vars={{ initialData }}>
