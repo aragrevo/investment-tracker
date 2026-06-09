@@ -1,5 +1,7 @@
 ---
 import { getInvestments, type Investment } from '../lib/db';
+import SummaryCard from '../components/SummaryCard.astro';
+import InvestmentTable from '../components/InvestmentTable.astro';
 
 const investments = await getInvestments();
 
@@ -15,21 +17,19 @@ function getPreviousValue(platform: string, year: number, data: Investment[]) {
   return null;
 }
 
-function getGrowth(data: Investment[]) {
-  return data.map(item => {
-    const prev = getPreviousValue(item.platform, item.year, data);
-    const growth = prev ? ((item.value - prev) / prev * 100) : null;
-    return { ...item, growth };
-  }).sort((a, b) => PLATFORMS.indexOf(a.platform) - PLATFORMS.indexOf(b.platform) || b.year - a.year);
+function getLatestValue(platform: string, data: Investment[]) {
+  const platformData = data.filter(d => d.platform === platform);
+  if (platformData.length === 0) return { value: 0, years: 0 };
+  const latest = platformData.sort((a, b) => b.year - a.year)[0];
+  return { value: latest.value, years: platformData.length };
 }
 
-function getTotalDeposit(platform: string, data: Investment[]) {
-  return data
-    .filter(d => d.platform === platform && d.deposit)
-    .reduce((sum, d) => sum + (d.deposit || 0), 0);
-}
+const summaries = PLATFORMS.map(platform => ({
+  platform,
+  ...getLatestValue(platform, investments),
+}));
 
-const enrichedData = getGrowth(investments);
+const initialData = investments;
 ---
 
 <!DOCTYPE html>
@@ -430,10 +430,6 @@ const enrichedData = getGrowth(investments);
 </head>
 
 <body>
-  <script is:inline define:vars={{ investments }}>
-    window.__INITIAL_DATA__ = investments;
-  </script>
-
   <div class="container">
     <header>
       <h1>Investment Tracker</h1>
@@ -443,48 +439,40 @@ const enrichedData = getGrowth(investments);
       </div>
     </header>
 
-    <div class="summary" id="summary"></div>
+    <div class="summary">
+      {summaries.map(s => (
+        <SummaryCard platform={s.platform} value={s.value} years={s.years} />
+      ))}
+    </div>
 
-      <div class="section">
-        <div class="section-title">Quanfury, Hapi, Binance y Tyba</div>
-        <div class="chart-container">
-          <canvas id="chart"></canvas>
-          <div class="chart-tooltip" id="chartTooltip">
-            <div class="tooltip-platform"></div>
-            <div class="tooltip-value"></div>
+    <div class="section">
+      <div class="section-title">Quanfury, Hapi, Binance y Tyba</div>
+      <div class="chart-container">
+        <canvas id="chart"></canvas>
+        <div class="chart-tooltip" id="chartTooltip">
+          <div class="tooltip-platform"></div>
+          <div class="tooltip-value"></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background:#3b82f6"></div>Quanfury
           </div>
-          <div class="legend">
-            <div class="legend-item">
-              <div class="legend-color" style="background:#3b82f6"></div>Quanfury
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background:#ef4444"></div>Hapi
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background:#eab308"></div>Binance
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background:#22c55e"></div>Tyba
-            </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background:#ef4444"></div>Hapi
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background:#eab308"></div>Binance
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background:#22c55e"></div>Tyba
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="section">
-        <div class="section-title">Registros</div>
-        <table id="table">
-          <thead>
-            <tr>
-              <th>Año</th>
-              <th>Valor (USD)</th>
-              <th>Depósito</th>
-              <th>ROI</th>
-              <th style="width: 160px;"></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
+    <div class="section">
+      <div class="section-title">Registros</div>
+      <InvestmentTable data={investments} />
     </div>
   </div>
 
@@ -523,133 +511,55 @@ const enrichedData = getGrowth(investments);
   <script>
     const YEARS = [2023, 2024, 2025, 2026, 2027];
     const PLATFORMS = ['Quanfury', 'Hapi', 'Binance', 'Tyba'];
-    const COLORS = { Quanfury: '#3b82f6', Hapi: '#ef4444', Binance: '#eab308', Tyba: '#22c55e' };
+    const COLORS: Record<string, string> = { Quanfury: '#3b82f6', Hapi: '#ef4444', Binance: '#eab308', Tyba: '#22c55e' };
 
-    const initialData = window.__INITIAL_DATA__ || [];
+    const initialData = (window as any).__INITIAL_DATA__ || [];
     let cachedData = initialData;
 
-    function showApp() {}
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/auth', { method: 'DELETE', credentials: 'include' });
+      window.location.href = '/login';
+    });
 
-    function getPreviousValue(platform, year, data) {
-      const sortedYears = YEARS.filter(y => y < year);
-      for (let i = sortedYears.length - 1; i >= 0; i--) {
-        const prev = data.find(d => d.platform === platform && d.year === sortedYears[i]);
-        if (prev) return prev.value;
-      }
-      return null;
-    }
+    document.getElementById('addBtn')?.addEventListener('click', () => openModal());
 
-    function getGrowth(data) {
-      return data.map(item => {
-        const prev = getPreviousValue(item.platform, item.year, data);
-        const growth = prev ? ((item.value - prev) / prev * 100) : null;
-        return { ...item, growth };
-      }).sort((a, b) => PLATFORMS.indexOf(a.platform) - PLATFORMS.indexOf(b.platform) || b.year - a.year);
-    }
+    document.getElementById('cancelBtn')?.addEventListener('click', closeModal);
 
-    function renderSummary(data) {
-      const container = document.getElementById('summary');
-      container.innerHTML = PLATFORMS.map(p => {
-        const platformData = data.filter(d => d.platform === p);
-        const latest = platformData.sort((a, b) => b.year - a.year)[0];
-        const years = platformData.length;
-        return `<div class="card">
-          <div class="card-label">${p} (2027)</div>
-          <div class="card-value ${p.toLowerCase()}">${latest ? '$' + latest.value.toLocaleString() : 'N/A'}</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${years} año${years !== 1 ? 's' : ''} registrado${years !== 1 ? 's' : ''}</div>
-        </div>`;
-      }).join('');
-    }
+    document.getElementById('modalOverlay')?.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('modalOverlay')) closeModal();
+    });
 
-    function getTotalDeposit(platform, data) {
-      return data
-        .filter(d => d.platform === platform && d.deposit)
-        .reduce((sum, d) => sum + (d.deposit || 0), 0);
-    }
-
-    function renderTable(data) {
-      const tbody = document.querySelector('#table tbody');
-      const enriched = getGrowth(data);
-      let html = '';
-
-      PLATFORMS.forEach(platform => {
-        const platformRows = enriched.filter(item => item.platform === platform);
-        if (platformRows.length === 0) return;
-
-        const totalDeposit = getTotalDeposit(platform, data);
-        const latestValue = platformRows[0].value;
-        const firstValue = platformRows[platformRows.length - 1].value;
-        const totalInvested = firstValue + totalDeposit;
-        let platformRoi = null;
-        if (totalInvested > 0) {
-          platformRoi = ((latestValue - totalInvested) / totalInvested * 100);
-        }
-        const roiDisplay = platformRoi !== null
-          ? `<span class="badge badge-roi ${platformRoi < 0 ? 'negative' : ''}">ROI ${platformRoi >= 0 ? '+' : ''}${platformRoi.toFixed(1)}%</span>`
-          : '';
-
-        html += `<tr class="platform-header collapsed" data-platform="${platform}">
-          <td colspan="5"><span class="collapse-icon">▼</span><span class="platform-dot ${platform.toLowerCase()}"></span>${platform} <span class="badge badge-deposit">Depositado $${totalDeposit.toLocaleString()}</span> ${roiDisplay}</td>
-        </tr>`;
-
-        platformRows.forEach(item => {
-          const depositDisplay = item.deposit ? `$${item.deposit.toLocaleString()}` : '—';
-          const prev = item.growth !== null ? enriched.find(r => r.platform === item.platform && r.year === item.year - 1) : null;
-          const prevValue = prev ? prev.value : null;
-          let roiDisplay = '—';
-          if (prevValue !== null && item.deposit !== undefined) {
-            const roi = ((item.value - prevValue - item.deposit) / (prevValue + item.deposit) * 100);
-            roiDisplay = `<span class="growth ${roi >= 0 ? 'positive' : 'negative'}">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</span>`;
-          } else if (item.growth !== null) {
-            roiDisplay = `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`;
-          }
-          html += `<tr class="platform-row hidden" data-platform="${platform}">
-            <td style="padding-left: 32px;">${item.year}</td>
-            <td>$${item.value.toLocaleString()}</td>
-            <td>${depositDisplay}</td>
-            <td>${roiDisplay}</td>
-            <td class="actions">
-              <button class="btn btn-small" data-action="edit" data-id="${item.id}">Editar</button>
-              <button class="btn btn-small btn-danger" data-action="delete" data-id="${item.id}">Eliminar</button>
-            </td>
-          </tr>`;
-        });
-      });
-
-      tbody.innerHTML = html;
-    }
-
-    document.querySelector('#table tbody').addEventListener('click', (e) => {
+    document.querySelector('#table tbody')?.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
-      const action = target.dataset.action;
-      const id = target.dataset.id;
+      const row = target.closest('tr');
+
+      if (row?.classList.contains('platform-header')) {
+        togglePlatform(row.getAttribute('data-platform')!);
+        return;
+      }
+
+      const action = (target as HTMLElement).dataset.action;
+      const id = (target as HTMLElement).dataset.id;
 
       if (action === 'edit') {
         const item = cachedData.find((d: any) => d.id == id);
         if (item) openModal(id, item);
       } else if (action === 'delete') {
         deleteInvestment(id!);
-      } else {
-        const row = target.closest('tr');
-        if (row?.classList.contains('platform-header')) {
-          togglePlatform(row.getAttribute('data-platform')!);
-        }
       }
     });
 
-    function togglePlatform(platform) {
+    function togglePlatform(platform: string) {
       const header = document.querySelector(`tr.platform-header[data-platform="${platform}"]`);
       const rows = document.querySelectorAll(`tr.platform-row[data-platform="${platform}"]`);
-      const isCollapsed = header!.classList.contains('collapsed');
+      const isCollapsed = header?.classList.contains('collapsed');
 
-      header!.classList.toggle('collapsed');
+      header?.classList.toggle('collapsed');
 
       if (isCollapsed) {
         rows.forEach(row => {
           row.classList.remove('hidden');
-          requestAnimationFrame(() => {
-            row.classList.remove('collapsing');
-          });
+          requestAnimationFrame(() => row.classList.remove('collapsing'));
         });
       } else {
         rows.forEach(row => row.classList.add('collapsing'));
@@ -662,10 +572,76 @@ const enrichedData = getGrowth(investments);
       }
     }
 
+    function openModal(id: string | null = null, item: any = null) {
+      document.getElementById('modalOverlay')?.classList.add('active');
+      (document.getElementById('editId') as HTMLInputElement).value = id || '';
+      document.getElementById('modalTitle')!.textContent = id ? 'Editar Inversión' : 'Agregar Inversión';
+
+      if (item) {
+        (document.getElementById('platform') as HTMLSelectElement).value = item.platform;
+        (document.getElementById('year') as HTMLInputElement).value = item.year;
+        (document.getElementById('value') as HTMLInputElement).value = item.value;
+        (document.getElementById('deposit') as HTMLInputElement).value = item.deposit || '';
+      } else {
+        (document.getElementById('platform') as HTMLSelectElement).value = 'Quanfury';
+        (document.getElementById('year') as HTMLInputElement).value = '2024';
+        (document.getElementById('value') as HTMLInputElement).value = '';
+        (document.getElementById('deposit') as HTMLInputElement).value = '';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay')?.classList.remove('active');
+    }
+
+    async function saveInvestment() {
+      const id = (document.getElementById('editId') as HTMLInputElement).value;
+      const platform = (document.getElementById('platform') as HTMLSelectElement).value;
+      const year = parseInt((document.getElementById('year') as HTMLInputElement).value);
+      const value = parseFloat((document.getElementById('value') as HTMLInputElement).value) || 0;
+      const deposit = parseFloat((document.getElementById('deposit') as HTMLInputElement).value) || 0;
+
+      if (!value || value < 0) {
+        alert('ingresá un valor válido');
+        return;
+      }
+
+      if (id) {
+        cachedData = cachedData.map((d: any) => d.id == id ? { ...d, platform, year, value, deposit } : d);
+      } else {
+        cachedData.push({ id: Date.now(), platform, year, value, deposit });
+      }
+
+      await fetch('/api/investments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ data: cachedData }),
+      });
+
+      window.location.reload();
+    }
+
+    async function deleteInvestment(id: string) {
+      if (!confirm('eliminar esta inversión?')) return;
+      cachedData = cachedData.filter((d: any) => d.id != id);
+      await fetch('/api/investments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ data: cachedData }),
+      });
+      window.location.reload();
+    }
+
+    document.getElementById('saveBtn')?.addEventListener('click', saveInvestment);
+
     let chartPoints: any[] = [];
 
-    function renderChart(data) {
+    function renderChart() {
       const canvas = document.getElementById('chart') as HTMLCanvasElement;
+      if (!canvas) return;
+
       const ctx = canvas.getContext('2d')!;
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
@@ -678,7 +654,7 @@ const enrichedData = getGrowth(investments);
       const chartW = rect.width - padding.left - padding.right;
       const chartH = rect.height - padding.top - padding.bottom;
 
-      const allValues = data.map((d: any) => d.value);
+      const allValues = cachedData.map((d: any) => d.value);
       const maxValue = Math.max(...allValues) * 1.15;
       const yearCount = YEARS.length;
 
@@ -710,11 +686,11 @@ const enrichedData = getGrowth(investments);
       chartPoints = [];
       PLATFORMS.forEach(platform => {
         const platformData = YEARS.map(year => {
-          const found = data.find((d: any) => d.platform === platform && d.year === year);
+          const found = cachedData.find((d: any) => d.platform === platform && d.year === year);
           return found ? found.value : null;
         });
 
-        ctx.strokeStyle = COLORS[platform as keyof typeof COLORS];
+        ctx.strokeStyle = COLORS[platform];
         ctx.lineWidth = 2;
         ctx.beginPath();
         let started = false;
@@ -736,7 +712,7 @@ const enrichedData = getGrowth(investments);
           if (val === null) return;
           const x = padding.left + (chartW / (yearCount - 1)) * i;
           const y = padding.top + chartH - (val / maxValue) * chartH;
-          ctx.fillStyle = COLORS[platform as keyof typeof COLORS];
+          ctx.fillStyle = COLORS[platform];
           ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();
@@ -745,7 +721,7 @@ const enrichedData = getGrowth(investments);
       });
     }
 
-    document.getElementById('chart')!.addEventListener('mousemove', (e) => {
+    document.getElementById('chart')?.addEventListener('mousemove', (e) => {
       const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -756,7 +732,7 @@ const enrichedData = getGrowth(investments);
       );
 
       if (nearPoint) {
-        tooltip.querySelector('.tooltip-platform')!.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[nearPoint.platform as keyof typeof COLORS]};margin-right:6px"></span>${nearPoint.platform} ${nearPoint.year}`;
+        tooltip.querySelector('.tooltip-platform')!.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[nearPoint.platform]};margin-right:6px"></span>${nearPoint.platform} ${nearPoint.year}`;
         tooltip.querySelector('.tooltip-value')!.textContent = '$' + nearPoint.value.toLocaleString();
         tooltip.classList.add('visible');
         tooltip.style.left = (nearPoint.x + 12) + 'px';
@@ -766,99 +742,17 @@ const enrichedData = getGrowth(investments);
       }
     });
 
-    document.getElementById('chart')!.addEventListener('mouseleave', () => {
-      document.getElementById('chartTooltip')!.classList.remove('visible');
+    document.getElementById('chart')?.addEventListener('mouseleave', () => {
+      document.getElementById('chartTooltip')?.classList.remove('visible');
     });
 
-    function openModal(id = null, item = null) {
-      document.getElementById('modalOverlay')!.classList.add('active');
-      (document.getElementById('editId') as HTMLInputElement).value = id || '';
-      document.getElementById('modalTitle')!.textContent = id ? 'Editar Inversión' : 'Agregar Inversión';
-      if (item) {
-        (document.getElementById('platform') as HTMLSelectElement).value = item.platform;
-        (document.getElementById('year') as HTMLInputElement).value = item.year;
-        (document.getElementById('value') as HTMLInputElement).value = item.value;
-        (document.getElementById('deposit') as HTMLInputElement).value = item.deposit || '';
-      } else {
-        (document.getElementById('platform') as HTMLSelectElement).value = 'Quanfury';
-        (document.getElementById('year') as HTMLInputElement).value = '2024';
-        (document.getElementById('value') as HTMLInputElement).value = '';
-        (document.getElementById('deposit') as HTMLInputElement).value = '';
-      }
-    }
+    window.addEventListener('resize', renderChart);
 
-    function closeModal() {
-      document.getElementById('modalOverlay')!.classList.remove('active');
-    }
-
-    document.getElementById('cancelBtn')!.addEventListener('click', closeModal);
-    document.getElementById('modalOverlay')!.addEventListener('click', (e) => {
-      if (e.target === document.getElementById('modalOverlay')) closeModal();
-    });
-
-    document.getElementById('addBtn')!.addEventListener('click', () => openModal());
-
-    async function saveInvestment() {
-      const id = (document.getElementById('editId') as HTMLInputElement).value;
-      const platform = (document.getElementById('platform') as HTMLSelectElement).value;
-      const year = parseInt((document.getElementById('year') as HTMLInputElement).value);
-      const value = parseFloat((document.getElementById('value') as HTMLInputElement).value) || 0;
-      const deposit = parseFloat((document.getElementById('deposit') as HTMLInputElement).value) || 0;
-
-      if (!value || value < 0) {
-        alert('ingresá un valor válido');
-        return;
-      }
-
-      if (id) {
-        cachedData = cachedData.map((d: any) => d.id == id ? { ...d, platform, year, value, deposit } : d);
-      } else {
-        cachedData.push({ id: Date.now(), platform, year, value, deposit });
-      }
-
-      await fetch('/api/investments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ data: cachedData }),
-      });
-
-      closeModal();
-      refresh();
-    }
-
-    async function deleteInvestment(id) {
-      if (!confirm('eliminar esta inversión?')) return;
-      cachedData = cachedData.filter((d: any) => d.id != id);
-      await fetch('/api/investments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ data: cachedData }),
-      });
-      refresh();
-    }
-
-    function refresh() {
-      renderSummary(cachedData);
-      renderTable(cachedData);
-      renderChart(cachedData);
-    }
-
-window.addEventListener('resize', () => {
-      renderChart(cachedData);
-    });
-
-    async function doLogout() {
-      await fetch('/api/auth', { method: 'DELETE', credentials: 'include' });
-      window.location.href = '/login';
-    }
-
-    document.getElementById('logoutBtn')!.addEventListener('click', doLogout);
-    document.getElementById('saveBtn')!.addEventListener('click', saveInvestment);
-
-    showApp();
-    refresh();
+    renderChart();
   </script>
 </body>
 </html>
+
+<script is:inline define:vars={{ initialData }}>
+  window.__INITIAL_DATA__ = initialData;
+</script>
