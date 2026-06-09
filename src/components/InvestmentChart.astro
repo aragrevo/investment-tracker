@@ -1,0 +1,275 @@
+---
+import type { Investment } from "../lib/db";
+
+interface Props {
+  data: Investment[];
+}
+
+const { data } = Astro.props;
+
+const YEARS = [2023, 2024, 2025, 2026, 2027];
+const PLATFORMS = ["Quanfury", "Hapi", "Binance", "Tyba"];
+const COLORS: Record<string, string> = {
+  Quanfury: "#3b82f6",
+  Hapi: "#ef4444",
+  Binance: "#eab308",
+  Tyba: "#22c55e",
+};
+
+const width = 800;
+const height = 300;
+const padding = { top: 20, right: 30, bottom: 40, left: 60 };
+const chartW = width - padding.left - padding.right;
+const chartH = height - padding.top - padding.bottom;
+
+const allValues = data.map((d) => d.value);
+const maxValue = Math.max(...allValues) * 1.15;
+
+function getX(yearIndex: number) {
+  return padding.left + (chartW / (YEARS.length - 1)) * yearIndex;
+}
+
+function getY(value: number) {
+  return padding.top + chartH - (value / maxValue) * chartH;
+}
+
+function getPoints(platform: string) {
+  return YEARS.map((year, i) => {
+    const found = data.find((d) => d.platform === platform && d.year === year);
+    if (!found) return null;
+    return {
+      x: getX(i),
+      y: getY(found.value),
+      value: found.value,
+      year,
+      platform,
+    };
+  }).filter(Boolean);
+}
+
+const gridLines = 5;
+const gridYValues = Array.from({ length: gridLines + 1 }, (_, i) =>
+  Math.round(maxValue - (maxValue / gridLines) * i),
+);
+---
+
+<style>
+  .chart-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+  }
+
+  .chart-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .chart-svg circle {
+    cursor: pointer;
+    transition: r 0.15s ease;
+  }
+
+  .chart-svg circle:hover {
+    r: 4;
+  }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+  }
+
+  .legend-color {
+    width: 12px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .chart-tooltip {
+    position: absolute;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  .chart-tooltip.visible {
+    opacity: 1;
+  }
+
+  .chart-tooltip .tooltip-platform {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .chart-tooltip .tooltip-value {
+    color: var(--text-muted);
+  }
+</style>
+
+<div class="chart-container" id="chartContainer">
+  <svg
+    class="chart-svg"
+    viewBox={`0 0 ${width} ${height}`}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <!-- Grid lines -->
+    {
+      gridYValues.map((label, i) => {
+        const y = padding.top + (chartH / gridLines) * i;
+        return (
+          <>
+            <line
+              x1={padding.left}
+              y1={y}
+              x2={padding.left + chartW}
+              y2={y}
+              stroke="#2d2d4a"
+              stroke-width="1"
+            />
+            <text
+              x={padding.left - 8}
+              y={y + 4}
+              text-anchor="end"
+              fill="#8888a8"
+              font-size="11"
+              font-family="-apple-system, sans-serif"
+            >
+              ${label.toLocaleString()}
+            </text>
+          </>
+        );
+      })
+    }
+
+    <!-- X-axis labels -->
+    {
+      YEARS.map((year, i) => {
+        const x = getX(i);
+        return (
+          <text
+            x={x}
+            y={height - 10}
+            text-anchor="middle"
+            fill="#8888a8"
+            font-size="11"
+            font-family="-apple-system, sans-serif"
+          >
+            {year}
+          </text>
+        );
+      })
+    }
+
+    <!-- Lines -->
+    {
+      PLATFORMS.map((platform) => {
+        const points = getPoints(platform);
+        if (points.length < 2) return null;
+
+        const pathData = points
+          .map((p, i) => (i === 0 ? `M ${p!.x} ${p!.y}` : `L ${p!.x} ${p!.y}`))
+          .join(" ");
+
+        return (
+          <>
+            <path
+              d={pathData}
+              fill="none"
+              stroke={COLORS[platform]}
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            {points.map((p) => (
+              <circle
+                cx={p!.x}
+                cy={p!.y}
+                r="3"
+                fill={COLORS[platform]}
+                data-platform={p!.platform}
+                data-year={p!.year}
+                data-value={p!.value}
+              />
+            ))}
+          </>
+        );
+      })
+    }
+  </svg>
+
+  <div class="chart-tooltip" id="chartTooltip">
+    <div class="tooltip-platform"></div>
+    <div class="tooltip-value"></div>
+  </div>
+
+  <div class="legend">
+    {
+      PLATFORMS.map((platform) => (
+        <div class="legend-item">
+          <div class="legend-color" style={`background: ${COLORS[platform]}`} />
+          {platform}
+        </div>
+      ))
+    }
+  </div>
+</div>
+
+<script>
+  const container = document.getElementById("chartContainer");
+  const tooltip = document.getElementById("chartTooltip");
+  const circles = container?.querySelectorAll("circle");
+
+  circles?.forEach((circle) => {
+    circle.addEventListener("mouseenter", (e) => {
+      const target = e.target as SVGCircleElement;
+      const platform = target.getAttribute("data-platform");
+      const year = target.getAttribute("data-year");
+      const value = target.getAttribute("data-value");
+
+      if (tooltip && platform && year && value) {
+        const colors: Record<string, string> = {
+          Quanfury: "#3b82f6",
+          Hapi: "#ef4444",
+          Binance: "#eab308",
+          Tyba: "#22c55e",
+        };
+        const color = colors[platform] || "#888";
+
+        tooltip.querySelector(".tooltip-platform")!.innerHTML =
+          `${platform} ${year}`;
+        tooltip.querySelector(".tooltip-value")!.textContent =
+          "$" + parseInt(value).toLocaleString();
+
+        const rect = target.getBoundingClientRect();
+        const containerRect = container!.getBoundingClientRect();
+        tooltip.style.left = rect.left - containerRect.left + 12 + "px";
+        tooltip.style.top = rect.top - containerRect.top - 10 + "px";
+        tooltip.style.borderLeft = `3px solid ${color}`;
+        tooltip.classList.add("visible");
+      }
+    });
+
+    circle.addEventListener("mouseleave", () => {
+      tooltip?.classList.remove("visible");
+    });
+  });
+</script>
