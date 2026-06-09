@@ -3,18 +3,98 @@ interface Props {
   platform: string;
   value: number;
   years: number;
+  deposit: number;
+  roi: number | null;
 }
 
-const { platform, value, years } = Astro.props;
+const { platform, value, years, deposit, roi } = Astro.props;
 const colorClass = platform.toLowerCase();
 ---
 
+<style>
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .card-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    text-wrap: nowrap;
+  }
+
+  .card-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  .card-value.quanfury {
+    color: var(--quanfury);
+  }
+  .card-value.hapi {
+    color: var(--hapi);
+  }
+  .card-value.binance {
+    color: var(--binance);
+  }
+  .card-value.tyba {
+    color: var(--tyba);
+  }
+
+  .card-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge-roi {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+  }
+
+  .badge-roi.negative {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+</style>
+
 <div class="card">
-  <div class="card-label">{platform} (2027)</div>
-  <div class={`card-value ${colorClass}`}>
-    {value > 0 ? '$' + value.toLocaleString() : 'N/A'}
+  <div class="card-label">
+    {platform} (2027)
+    {
+      roi !== null && (
+        <div
+          class={`badge badge-roi ${roi < 0 ? "negative" : ""}`}
+          style="margin-left: auto"
+        >
+          ROI {roi >= 0 ? "+" : ""}
+          {roi.toFixed(1)}%
+        </div>
+      )
+    }
   </div>
-  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
-    {years} año{years !== 1 ? 's' : ''} registrado{years !== 1 ? 's' : ''}
+  <div class={`card-value ${colorClass}`}>
+    {value > 0 ? "$" + value.toLocaleString() : "N/A"}
+  </div>
+  <div class="card-meta">
+    {years} año{years !== 1 ? "s" : ""}
+    {deposit > 0 && `· Depositado ${deposit.toLocaleString()}`}
   </div>
 </div>
