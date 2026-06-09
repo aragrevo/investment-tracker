@@ -2,26 +2,29 @@
 
 ## Architecture
 
-- Single-file SPA: `index.html` contains all CSS and JS inline (no bundler, no framework)
-- Two API endpoints:
-  - `api/auth.js` — authentication (login/logout/session check) with JWT in httpOnly cookies
-  - `api/investments.js` — Vercel serverless function backed by Upstash Redis (protected)
+- **Astro 5** with SSR output and Vercel adapter
+- Middleware (`src/middleware/index.ts`) handles JWT auth, redirects to `/login` if not authenticated
+- Data layer (`src/lib/db.ts`) loads/stores investments from Upstash Redis directly on server
+- Pages:
+  - `src/pages/login.astro` — login form (public)
+  - `src/pages/index.astro` — main dashboard (protected, only accessible when authenticated)
+- API routes at `src/pages/api/`:
+  - `auth.ts` — login/logout
+  - `investments.ts` — protected CRUD
 - Data stored under Redis key `investments:data`
 - UI language is Spanish throughout
 
 ## Running Locally
 
-No dev server configured. To run locally you need Vercel CLI:
-
 ```bash
-npx vercel dev
+pnpm dev
 ```
 
-Opening `index.html` directly in a browser will **not** work — the `fetch('/api/investments')` calls require the Vercel dev server.
+Opens at `http://localhost:4321`
 
 ## Environment Variables
 
-Required (set in Vercel dashboard or `.env.local`):
+Required (set in `.env.local`):
 
 - `KV_REST_API_URL` — Upstash Redis REST URL
 - `KV_REST_API_TOKEN` — Upstash Redis REST token
@@ -35,8 +38,10 @@ There is no test suite, linter, formatter, type checker, or CI pipeline. Changes
 
 ## Key Patterns
 
-- All data mutations go through `POST /api/investments` which replaces the entire dataset (not patch)
-- Frontend caches data in `cachedData` variable; `refresh()` re-fetches from API
+- Middleware verifies JWT cookie on every request, redirects to `/login` if no valid session
+- Page loads data from Redis directly (server-side) when authenticated
+- Client receives pre-rendered data via `define:vars`
+- Data mutations POST to `/api/investments` which updates Redis
 - IDs are `Date.now() + Math.random()` — not UUIDs
-- ROI formula differs between per-row and per-platform; see `index.html` lines 530–535 vs 514–518
+- ROI formula differs between per-row and per-platform; see `src/pages/index.astro`
 - Platform colors are hardcoded in both CSS variables and the `COLORS` JS object — keep in sync
