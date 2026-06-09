@@ -1,0 +1,260 @@
+---
+import type { Investment } from '../lib/db';
+
+interface Props {
+  data: Investment[];
+}
+
+const { data } = Astro.props;
+
+const YEARS = [2023, 2024, 2025, 2026, 2027];
+const PLATFORMS = ['Quanfury', 'Hapi', 'Binance', 'Tyba'];
+
+function getPreviousValue(platform: string, year: number, data: Investment[]) {
+  const sortedYears = YEARS.filter(y => y < year);
+  for (let i = sortedYears.length - 1; i >= 0; i--) {
+    const prev = data.find(d => d.platform === platform && d.year === sortedYears[i]);
+    if (prev) return prev.value;
+  }
+  return null;
+}
+
+function getGrowth(data: Investment[]) {
+  return data.map(item => {
+    const prev = getPreviousValue(item.platform, item.year, data);
+    const growth = prev ? ((item.value - prev) / prev * 100) : null;
+    return { ...item, growth };
+  }).sort((a, b) => PLATFORMS.indexOf(a.platform) - PLATFORMS.indexOf(b.platform) || b.year - a.year);
+}
+
+function getTotalDeposit(platform: string, data: Investment[]) {
+  return data
+    .filter(d => d.platform === platform && d.deposit)
+    .reduce((sum, d) => sum + (d.deposit || 0), 0);
+}
+
+const enrichedData = getGrowth(data);
+---
+
+<style>
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: opacity 0.2s;
+  }
+
+  .btn:hover {
+    opacity: 0.85;
+  }
+
+  .btn-danger {
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    background: transparent;
+  }
+
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  th, td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    background: var(--bg);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .platform-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+
+  .platform-dot.quanfury { background: var(--quanfury); }
+  .platform-dot.hapi { background: var(--hapi); }
+  .platform-dot.binance { background: var(--binance); }
+  .platform-dot.tyba { background: var(--tyba); }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    max-width: 120px;
+  }
+
+  .platform-header td {
+    background: var(--bg);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .platform-header td:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .collapse-icon {
+    display: inline-block;
+    margin-right: 8px;
+    transition: transform 0.3s ease;
+    font-size: 0.7rem;
+  }
+
+  .platform-header.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+  }
+
+  .platform-row {
+    transition: opacity 0.25s ease;
+    opacity: 1;
+  }
+
+  .platform-row.collapsing {
+    opacity: 0;
+  }
+
+  .platform-row.hidden {
+    display: none;
+  }
+</style>
+
+<style is:global>
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge-deposit {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+  }
+
+  .badge-roi {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+  }
+
+  .badge-roi.negative {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  .growth {
+    font-size: 0.85rem;
+  }
+
+  .growth.positive {
+    color: #22c55e;
+  }
+
+  .growth.negative {
+    color: #ef4444;
+  }
+</style>
+
+<table id="table">
+  <thead>
+    <tr>
+      <th>Año</th>
+      <th>Valor (USD)</th>
+      <th>Depósito</th>
+      <th>ROI</th>
+      <th style="width: 160px;"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {PLATFORMS.map(platform => {
+      const platformRows = enrichedData.filter(item => item.platform === platform);
+      if (platformRows.length === 0) return null;
+
+      const totalDeposit = getTotalDeposit(platform, data);
+      const latestValue = platformRows[0].value;
+      const firstValue = platformRows[platformRows.length - 1].value;
+      const totalInvested = firstValue + totalDeposit;
+      let platformRoi = null;
+      if (totalInvested > 0) {
+        platformRoi = ((latestValue - totalInvested) / totalInvested * 100);
+      }
+      const roiDisplay = platformRoi !== null
+        ? `<span class="badge badge-roi ${platformRoi < 0 ? 'negative' : ''}">ROI ${platformRoi >= 0 ? '+' : ''}${platformRoi.toFixed(1)}%</span>`
+        : '';
+
+      return (
+        <>
+          <tr class="platform-header" data-platform={platform}>
+            <td colspan="5">
+              <span class="collapse-icon">▼</span>
+              <span class={`platform-dot ${platform.toLowerCase()}`}></span>
+              {platform}
+              <span class="badge badge-deposit">Depositado ${totalDeposit.toLocaleString()}</span>
+              <Fragment set:html={roiDisplay} />
+            </td>
+          </tr>
+          {platformRows.map(item => {
+            const depositDisplay = item.deposit ? `$${item.deposit.toLocaleString()}` : '—';
+            const prev = item.growth !== null ? enrichedData.find(r => r.platform === item.platform && r.year === item.year - 1) : null;
+            const prevValue = prev ? prev.value : null;
+            let roiDisplay = '—';
+            if (prevValue !== null && item.deposit !== undefined) {
+              const roi = ((item.value - prevValue - item.deposit) / (prevValue + item.deposit) * 100);
+              roiDisplay = `<span class="growth ${roi >= 0 ? 'positive' : 'negative'}">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</span>`;
+            } else if (item.growth !== null) {
+              roiDisplay = `<span class="growth ${item.growth >= 0 ? 'positive' : 'negative'}">${item.growth >= 0 ? '+' : ''}${item.growth.toFixed(1)}%</span>`;
+            }
+            return (
+              <tr class="platform-row" data-platform={platform} data-id={item.id}>
+                <td style="padding-left: 32px;">{item.year}</td>
+                <td>${item.value.toLocaleString()}</td>
+                <td>{depositDisplay}</td>
+                <td set:html={roiDisplay} />
+                <td class="actions">
+                  <button class="btn btn-small" data-action="edit" data-id={item.id}>Editar</button>
+                  <button class="btn btn-small btn-danger" data-action="delete" data-id={item.id}>Eliminar</button>
+                </td>
+              </tr>
+            );
+          })}
+        </>
+      );
+    })}
+  </tbody>
+</table>

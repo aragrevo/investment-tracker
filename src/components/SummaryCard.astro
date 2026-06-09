@@ -1,0 +1,20 @@
+---
+interface Props {
+  platform: string;
+  value: number;
+  years: number;
+}
+
+const { platform, value, years } = Astro.props;
+const colorClass = platform.toLowerCase();
+---
+
+<div class="card">
+  <div class="card-label">{platform} (2027)</div>
+  <div class={`card-value ${colorClass}`}>
+    {value > 0 ? '$' + value.toLocaleString() : 'N/A'}
+  </div>
+  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+    {years} año{years !== 1 ? 's' : ''} registrado{years !== 1 ? 's' : ''}
+  </div>
+</div>
