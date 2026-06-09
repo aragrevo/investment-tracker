@@ -5,9 +5,10 @@ interface Props {
   years: number;
   deposit: number;
   roi: number | null;
+  ea: number | null;
 }
 
-const { platform, value, years, deposit, roi } = Astro.props;
+const { platform, value, years, deposit, roi, ea } = Astro.props;
 const colorClass = platform.toLowerCase();
 ---
 
@@ -52,6 +53,9 @@ const colorClass = platform.toLowerCase();
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .badge {
@@ -73,28 +77,51 @@ const colorClass = platform.toLowerCase();
     background: rgba(239, 68, 68, 0.15);
     color: #ef4444;
   }
+
+  .badge-ea {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+  }
+
+  .badge-ea.negative {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
 </style>
 
 <div class="card">
   <div class="card-label">
     {platform} (2027)
-    {
-      roi !== null && (
-        <div
-          class={`badge badge-roi ${roi < 0 ? "negative" : ""}`}
-          style="margin-left: auto"
-        >
-          ROI {roi >= 0 ? "+" : ""}
-          {roi.toFixed(1)}%
-        </div>
-      )
-    }
+    <div
+      class="badges"
+      style="margin-left: auto; display: flex; gap: 6px; flex-direction: column;"
+    >
+      {
+        roi !== null && (
+          <div class={`badge badge-roi ${roi < 0 ? "negative" : ""}`}>
+            ROI {roi >= 0 ? "+" : ""}
+            {roi.toFixed(1)}%
+          </div>
+        )
+      }
+    </div>
   </div>
   <div class={`card-value ${colorClass}`}>
     {value > 0 ? "$" + value.toLocaleString() : "N/A"}
   </div>
   <div class="card-meta">
     {years} año{years !== 1 ? "s" : ""}
-    {deposit > 0 && `· Depositado ${deposit.toLocaleString()}`}
+    {deposit > 0 && `· Dep. ${deposit.toLocaleString()}`}
+    {
+      ea !== null && (
+        <div
+          class={`badge badge-ea ${ea < 0 ? "negative" : ""}`}
+          style="margin-left: auto;"
+        >
+          EA {ea >= 0 ? "+" : ""}
+          {ea.toFixed(1)}%
+        </div>
+      )
+    }
   </div>
 </div>

@@ -23,7 +23,7 @@ function getPreviousValue(platform: string, year: number, data: Investment[]) {
 function getPlatformSummary(platform: string, data: Investment[]) {
   const platformData = data.filter((d) => d.platform === platform);
   if (platformData.length === 0)
-    return { value: 0, years: 0, deposit: 0, roi: null };
+    return { value: 0, years: 0, deposit: 0, roi: null, ea: null };
 
   const sorted = platformData.sort((a, b) => b.year - a.year);
   const latest = sorted[0];
@@ -35,7 +35,13 @@ function getPlatformSummary(platform: string, data: Investment[]) {
       ? ((latest.value - totalInvested) / totalInvested) * 100
       : null;
 
-  return { value: latest.value, years: platformData.length, deposit, roi };
+  const yearCount = latest.year - oldest.year;
+  const ea =
+    totalInvested > 0 && yearCount > 0
+      ? (Math.pow(latest.value / totalInvested, 1 / yearCount) - 1) * 100
+      : null;
+
+  return { value: latest.value, years: platformData.length, deposit, roi, ea };
 }
 
 const summaries = PLATFORMS.map((platform) => ({
@@ -452,6 +458,7 @@ const initialData = investments;
               years={s.years}
               deposit={s.deposit}
               roi={s.roi}
+              ea={s.ea}
             />
           ))
         }
